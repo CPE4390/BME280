@@ -32,6 +32,7 @@
 //Project includes
 #include "LCD.h"
 #include "../src/bme280.h"
+#include "../src/bme280_selftest.h"
 #include "../src/pic18_i2c.h"
 #include <stdio.h>
 /*
@@ -41,6 +42,7 @@ Connections:
  */
 
 char lcd[20];
+struct bme280_dev dev;
 
 void main(void) {
     OSCTUNEbits.PLLEN = 1;
@@ -48,14 +50,49 @@ void main(void) {
     LATDbits.LATD0 = 1;
     LCDInit();
     LCDClear();
+    LCDWriteLine("Starting", 0);
 
     pic18_i2c_enable();
+    dev.dev_id = BME280_I2C_ADDR_PRIM;
+    dev.intf = BME280_I2C_INTF;
+    dev.read = pic18_i2c_read;
+    dev.write = pic18_i2c_write;
+    dev.delay_ms = pic18_delay_ms;
 
-    LCDWriteLine("Starting", 0);
-    
+    char rslt = bme280_crc_selftest(&dev);
+    if (rslt != BME280_OK) {
+        LCDWriteLine("Self test failed", 1);
+        while (1);
+    }
+
+    rslt = bme280_init(&dev);
+    if (rslt != BME280_OK) {
+        LCDWriteLine("Init failed", 1);
+        while (1);
+    } else {
+        LCDWriteLine("Initialized", 1);
+        __delay_ms(500);
+    }
+
+    uint8_t settings_sel;
+    /* Recommended mode of operation: Indoor navigation */
+    dev.settings.osr_h = BME280_OVERSAMPLING_1X;
+    dev.settings.osr_p = BME280_OVERSAMPLING_16X;
+    dev.settings.osr_t = BME280_OVERSAMPLING_2X;
+    dev.settings.filter = BME280_FILTER_COEFF_16;
+    settings_sel = BME280_OSR_PRESS_SEL | BME280_OSR_TEMP_SEL | BME280_OSR_HUM_SEL | BME280_FILTER_SEL;
+    rslt = bme280_set_sensor_settings(settings_sel, &dev);
+    rslt = bme280_set_sensor_mode(BME280_NORMAL_MODE, &dev);
+    struct bme280_data comp_data;
     while (1) {
         __delay_ms(500);
-        
+        rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
+        sprintf(lcd, "P:%.2f", comp_data.pressure / 100.0);
+        LCDClearLine(0);
+        LCDWriteLine(lcd, 0);
+        sprintf(lcd, "T:%.2f H:%.1f", comp_data.temperature / 100.0, comp_data.humidity / 1024.0);
+        LCDClearLine(1);
+        LCDWriteLine(lcd, 1);
         LATDbits.LATD0 ^= 1;
     }
 }
