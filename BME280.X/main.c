@@ -87,10 +87,10 @@ void main(void) {
     while (1) {
         __delay_ms(500);
         rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
-        sprintf(lcd, "P:%.2f", comp_data.pressure / 100.0);
+        sprintf(lcd, "P:%.2f Pa", comp_data.pressure / 100.0);
         LCDClearLine(0);
         LCDWriteLine(lcd, 0);
-        sprintf(lcd, "T:%.2f H:%.1f", comp_data.temperature / 100.0, comp_data.humidity / 1024.0);
+        sprintf(lcd, "T:%.2fC H:%.1f%%", comp_data.temperature / 100.0, comp_data.humidity / 1024.0);
         LCDClearLine(1);
         LCDWriteLine(lcd, 1);
         LATDbits.LATD0 ^= 1;
